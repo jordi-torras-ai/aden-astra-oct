@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#04090d">
+  <meta name="description" content="Una galaxia interactiva. Mueve el cursor y juega con la gravedad de miles de estrellas.">
+  <title>Órbita — un pequeño universo</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%2304090d'/%3E%3Cellipse cx='32' cy='32' rx='26' ry='12' transform='rotate(-40 32 32)' fill='none' stroke='%23e7e9e7' stroke-width='2'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%23e7e9e7'/%3E%3C/svg%3E">
+  <style>
+    :root { color-scheme: dark; --text: #e7e9e7; --muted: #91a0a8; --line: #d4e2ed24; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #04090d; }
+    body { color: var(--text); font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+    button, input { font: inherit; }
+    button { color: inherit; cursor: pointer; }
+    button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 2px solid #b1d5ef; outline-offset: 5px; }
+    button { -webkit-tap-highlight-color: transparent; }
+    svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+    #universe { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
+    .vignette { position: fixed; inset: 0; pointer-events: none; background: linear-gradient(180deg, #03070b70, transparent 19%, transparent 70%, #03070bac); }
+    .interface { position: fixed; inset: 0; pointer-events: none; transition: opacity .35s, visibility .35s; }
+    header { position: absolute; top: max(32px, env(safe-area-inset-top)); left: 40px; right: 40px; display: flex; align-items: center; justify-content: space-between; }
+    .brand { display: flex; gap: 13px; align-items: center; }
+    .brand svg { width: 35px; height: 35px; }
+    .wordmark { font-size: 24px; font-weight: 450; letter-spacing: -.8px; }
+    .brand-divider { height: 22px; width: 1px; background: var(--line); margin: 0 6px 0 14px; }
+    .eyebrow { font-size: 10px; letter-spacing: 2.3px; text-transform: uppercase; color: var(--muted); }
+    .status { display: flex; gap: 9px; align-items: center; font-size: 10px; letter-spacing: 1.6px; color: #a7b5bd; }
+    .status-dot { width: 5px; height: 5px; border-radius: 50%; background: #a1c2ce; box-shadow: 0 0 9px #92b8c870; }
+    body.paused .status-dot { background: #8e979d; box-shadow: none; }
+    footer { position: absolute; bottom: max(34px, env(safe-area-inset-bottom)); left: 40px; right: 40px; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+    .intro h1 { font-size: clamp(23px, 2.4vw, 34px); line-height: 1.2; letter-spacing: -1.15px; font-weight: 400; margin: 0 0 12px; }
+    .intro p { margin: 0; font-size: 12px; color: var(--muted); }
+    .intro p span { color: #d2dadd; }
+    .touch-help { display: none; }
+    .controls { display: flex; gap: 8px; pointer-events: auto; align-items: center; }
+    .control { height: 42px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 1px solid var(--line); border-radius: 24px; background: #0a1218a6; backdrop-filter: blur(16px); font-size: 12px; transition: background .2s, border-color .2s; }
+    .control:hover, .control[aria-expanded="true"] { background: #1a2931d9; border-color: #b9d4e64d; }
+    .control.icon-only { width: 42px; padding: 0; }
+    .settings { position: absolute; bottom: 60px; right: 0; width: 282px; border: 1px solid var(--line); border-radius: 16px; padding: 21px; background: #0b141ce8; backdrop-filter: blur(24px); pointer-events: auto; box-shadow: 0 12px 50px #0004; }
+    .settings[hidden] { display: none; }
+    .panel-title { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 23px; font-size: 12px; font-weight: 500; }
+    .panel-title span { font-size: 9px; letter-spacing: 1.5px; color: var(--muted); font-weight: 400; }
+    .setting + .setting { margin-top: 19px; }
+    .setting label { display: flex; justify-content: space-between; font-size: 12px; color: #c8d2d8; }
+    output { font-variant-numeric: tabular-nums; color: var(--muted); }
+    input[type="range"] { appearance: none; width: 100%; height: 22px; margin: 9px 0 0; background: transparent; cursor: pointer; accent-color: #c7dde9; }
+    input[type="range"]::-webkit-slider-runnable-track { height: 2px; background: #526573; border-radius: 2px; }
+    input[type="range"]::-webkit-slider-thumb { appearance: none; height: 10px; width: 10px; margin-top: -4px; background: #d8e6ec; border-radius: 50%; }
+    input[type="range"]::-moz-range-track { height: 2px; background: #526573; }
+    input[type="range"]::-moz-range-thumb { height: 10px; width: 10px; border: 0; background: #d8e6ec; border-radius: 50%; }
+    .reset { display: flex; align-items: center; gap: 8px; padding: 15px 0 0; margin-top: 18px; width: 100%; border: 0; border-top: 1px solid var(--line); background: transparent; color: #aabcc7; text-align: left; font-size: 11px; }
+    .reset:hover { color: #fff; }
+    .reset svg { width: 14px; height: 14px; }
+    #restore { position: fixed; bottom: max(28px, env(safe-area-inset-bottom)); right: 28px; opacity: 0; visibility: hidden; transition: opacity .3s; }
+    body.immersive .interface { opacity: 0; visibility: hidden; }
+    body.immersive #restore { opacity: .6; visibility: visible; }
+    body.immersive #restore:hover, body.immersive #restore:focus-visible { opacity: 1; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    .fallback { position: fixed; top: 45%; left: 10%; right: 10%; text-align: center; color: #c8d2d8; }
+    .fallback[hidden] { display: none; }
+    @media (pointer: coarse) { .mouse-help { display: none; } .touch-help { display: inline; } }
+    @media (max-width: 680px) {
+      header { top: max(24px, env(safe-area-inset-top)); left: 24px; right: 24px; }
+      .brand-divider, .brand .eyebrow { display: none; }
+      .wordmark { font-size: 22px; }
+      .status { font-size: 8px; letter-spacing: 1.2px; }
+      footer { left: 24px; right: 24px; bottom: max(24px, env(safe-area-inset-bottom)); flex-direction: column; align-items: flex-start; gap: 22px; }
+      .intro h1 { font-size: 26px; max-width: 250px; }
+      .intro p { font-size: 11px; max-width: 275px; line-height: 1.8; }
+      .controls { width: 100%; }
+      #immerse { margin-left: auto; }
+      .settings { bottom: 62px; right: 0; width: min(282px, 100%); }
+    }
+    @media (max-height: 480px) {
+      header { top: 18px; } footer { bottom: 18px; flex-direction: row; align-items: flex-end; }
+      .intro h1 { font-size: 22px; margin-bottom: 6px; } .controls { width: auto; }
+      .settings { padding: 15px; } .panel-title { margin-bottom: 13px; } .setting + .setting { margin-top: 7px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <canvas id="universe" tabindex="0" aria-label="Galaxia interactiva. Mueve el ratón o arrastra el dedo para atraer estrellas. Mantén pulsado para aumentar la gravedad. Con el teclado, usa las flechas para mover la gravedad y espacio para pausar." aria-describedby="keyboard-help"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="interface">
+    <header>
+      <div class="brand">
+        <svg viewBox="0 0 40 40" aria-hidden="true"><ellipse cx="20" cy="20" rx="18" ry="7.5" transform="rotate(-38 20 20)"/><circle cx="20" cy="20" r="3" fill="currentColor" stroke="none"/></svg>
+        <span class="wordmark">Órbita</span><span class="brand-divider"></span><span class="eyebrow">Un pequeño universo</span>
+      </div>
+      <div class="status" role="status"><span class="status-dot" aria-hidden="true"></span><span id="status-text">EN MOVIMIENTO</span></div>
+    </header>
+    <footer>
+      <div class="intro">
+        <h1>Todo empieza con un movimiento.</h1>
+        <p class="mouse-help">Mueve el cursor entre las estrellas. <span>Mantén pulsado para atraer.</span></p>
+        <p class="touch-help">Desliza el dedo entre las estrellas. <span>Tu tacto es gravedad.</span></p>
+      </div>
+      <div class="controls" aria-label="Controles de la galaxia">
+        <button class="control" id="pause" aria-label="Pausar animación" aria-pressed="false"><svg id="pause-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M7 5v10M13 5v10"/></svg><span id="pause-label">Pausar</span></button>
+        <button class="control" id="settings-toggle" aria-expanded="false" aria-controls="settings"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h7m4 0h3M3 14h3m4 0h7"/><circle cx="12" cy="6" r="2"/><circle cx="8" cy="14" r="2"/></svg>Ajustes</button>
+        <button class="control icon-only" id="immerse" aria-label="Solo galaxia: ocultar interfaz" title="Solo galaxia · H"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7V3h4m6 0h4v4M3 13v4h4m6 0h4v-4"/></svg></button>
+      </div>
+      <section class="settings" id="settings" aria-label="Ajustes de la galaxia" hidden>
+        <h2 class="panel-title">Tu universo<span>PARÁMETROS</span></h2>
+        <div class="setting"><label for="gravity">Gravedad<output id="gravity-value" for="gravity">1,0×</output></label><input id="gravity" type="range" min="0" max="2.5" step="0.1" value="1" aria-valuetext="1,0 veces"></div>
+        <div class="setting"><label for="speed">Velocidad<output id="speed-value" for="speed">1,0×</output></label><input id="speed" type="range" min="0.2" max="2" step="0.1" value="1" aria-valuetext="1,0 veces"></div>
+        <button class="reset" id="reset"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8a7 7 0 1 1 1 7M3 3v5h5"/></svg>Restablecer universo</button>
+      </section>
+    </footer>
+  </div>
+  <button class="control" id="restore" aria-label="Mostrar interfaz">Mostrar controles</button>
+  <p class="sr-only" id="keyboard-help">Flechas: mover la gravedad. Espacio: pausar o reanudar. H: ocultar o mostrar la interfaz. Escape: cerrar ajustes y mostrar la interfaz.</p>
+  <p class="fallback" id="fallback" hidden>Tu navegador no puede dibujar esta galaxia. Prueba a abrir el archivo en una versión reciente de Chrome, Safari o Firefox.</p>
+  <noscript><p class="fallback">Activa JavaScript para explorar esta galaxia.</p></noscript>
+  <script>
+  (() => {
+    'use strict';
+    // All artwork is procedural. No libraries, assets or network requests are needed.
+    const canvas = document.getElementById('universe');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) { document.getElementById('fallback').hidden = false; return; }
+    const $ = id => document.getElementById(id);
+    const TAU = Math.PI * 2;
+    const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+    let width = 0, height = 0, dpr = 1, scale = 1, centerX = 0, centerY = 0;
+    let stars = [], background = [], time = 0, previous = 0, frame = 0;
+    let paused = motionQuery.matches, gravity = 1, speed = 1, immersive = false;
+    let activePointer = null;
+    const pointer = { x: 0, y: 0, targetX: 0, targetY: 0, active: false, down: false, strength: 0 };
+    const parallax = { x: 0, y: 0 };
+    let seed = 873;
+    const random = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const gaussian = () => Math.sqrt(-2 * Math.log(Math.max(0.00001, random()))) * Math.cos(TAU * random());
+    const palette = [[98, 176, 255], [53, 119, 244], [130, 148, 255], [100, 207, 255]];
+
+    // Pre-rendered sprites keep thousands of soft glows inexpensive to draw.
+    function makeSprite(color, flare) {
+      const image = document.createElement('canvas'); image.width = image.height = 96;
+      const c = image.getContext('2d');
+      const rgb = color.join(',');
+      const glow = c.createRadialGradient(48, 48, 0, 48, 48, 48);
+      const core = color.map((channel, i) => Math.min(255, channel + (i === 0 ? 22 : 34))).join(',');
+      glow.addColorStop(0, `rgba(${core},1)`);
+      glow.addColorStop(.045, `rgba(${rgb},1)`);
+      glow.addColorStop(.11, `rgba(${rgb},.78)`);
+      glow.addColorStop(.22, `rgba(${rgb},.19)`);
+      glow.addColorStop(.50, `rgba(${rgb},.035)`);
+      glow.addColorStop(1, `rgba(${rgb},0)`);
+      c.fillStyle = glow; c.fillRect(0, 0, 96, 96);
+      if (flare) {
+        const light = c.createRadialGradient(48, 48, 0, 48, 48, 42);
+        light.addColorStop(0, `rgba(${rgb},.65)`); light.addColorStop(1, `rgba(${rgb},0)`);
+        c.fillStyle = light;
+        c.fillRect(8, 47.7, 80, .6); c.fillRect(47.7, 8, .6, 80);
+      }
+      return image;
+    }
+    const sprites = palette.map(c => makeSprite(c, false));
+    const flares = palette.map(c => makeSprite(c, true));
+    const haze = makeSprite([63, 131, 220], false);
+    const backdrop = document.createElement('canvas');
+
+    function populate() {
+      seed = 873;
+      const count = Math.round(Math.min(7200, Math.max(3600, width * height / 175)));
+      stars = Array.from({ length: count }, (_, i) => {
+        const core = i < count * .12;
+        const r = core ? Math.pow(random(), 1.7) * .19 : .055 + Math.pow(random(), .78) * 1.09;
+        const arm = Math.floor(random() * 3);
+        const spread = core ? random() * TAU : gaussian() * (.09 + .035 / (r + .2));
+        const angle = arm * TAU / 3 + r * 5.4 + spread;
+        const diffuse = !core && random() < .22;
+        const bright = random();
+        return {
+          r: Math.max(.008, r + (diffuse ? gaussian() * .09 : 0)),
+          angle: angle + (diffuse ? gaussian() * .4 : 0),
+          z: gaussian() * (core ? .024 : .018 + r * .024),
+          radius: bright > .992 ? 4.5 + random() * 2 : bright > .94 ? 1.6 + random() * 1.6 : .28 + Math.pow(random(), 2) * 1.05,
+          color: random() < .19 ? 2 : random() < .48 ? 1 : random() < .5 ? 0 : 3,
+          alpha: bright > .94 ? .76 + random() * .24 : .28 + random() * .66,
+          phase: random() * TAU, flare: bright > .992,
+          ox: 0, oy: 0, vx: 0, vy: 0
+        };
+      });
+      background = Array.from({ length: Math.round(width * height / 3300) }, () => ({
+        x: random(), y: random(), radius: .35 + random() * .8, alpha: .12 + random() * .5, color: Math.floor(random() * 4), phase: random() * TAU
+      }));
+    }
+
+    function resize() {
+      const oldScale = scale;
+      width = innerWidth; height = innerHeight; dpr = Math.min(devicePixelRatio || 1, 2);
+      canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      scale = Math.min(width * .38, height * .57);
+      if (width < 680) scale = Math.min(width * .58, height * .34);
+      centerX = width * .51; centerY = height * (width < 680 ? .43 : .48);
+      if (!stars.length) populate();
+      else for (const star of stars) { star.ox *= scale / oldScale; star.oy *= scale / oldScale; }
+      backdrop.width = canvas.width; backdrop.height = canvas.height;
+      const b = backdrop.getContext('2d'); b.setTransform(dpr, 0, 0, dpr, 0, 0);
+      b.fillStyle = '#04090d'; b.fillRect(0, 0, width, height);
+      const ambient = b.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(width, height) * .7);
+      ambient.addColorStop(0, '#0b1721'); ambient.addColorStop(.37, '#071017'); ambient.addColorStop(1, '#03070a');
+      b.fillStyle = ambient; b.fillRect(0, 0, width, height);
+      draw(0);
+    }
+
+    function draw(dt) {
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(backdrop, 0, 0, width, height);
+      ctx.globalCompositeOperation = 'lighter';
+      const ease = 1 - Math.exp(-dt * 5);
+      pointer.x += (pointer.targetX - pointer.x) * Math.min(1, dt * 12);
+      pointer.y += (pointer.targetY - pointer.y) * Math.min(1, dt * 12);
+      pointer.strength += ((pointer.active ? (pointer.down ? 2.9 : 1) * gravity : 0) - pointer.strength) * ease;
+      parallax.x += ((pointer.active ? (pointer.x / width - .5) * 14 : 0) - parallax.x) * ease;
+      parallax.y += ((pointer.active ? (pointer.y / height - .5) * 10 : 0) - parallax.y) * ease;
+      for (const star of background) {
+        const size = star.radius * 5;
+        ctx.globalAlpha = star.alpha * (.85 + .15 * Math.sin(time * .4 + star.phase));
+        ctx.drawImage(sprites[star.color], star.x * width + parallax.x * .25 - size / 2, star.y * height + parallax.y * .25 - size / 2, size, size);
+      }
+      // A tilted disc projects a slowly revolving, three-armed spiral into 2D.
+      const tilt = -.38, cosTilt = Math.cos(tilt), sinTilt = Math.sin(tilt);
+      const cx = centerX + parallax.x, cy = centerY + parallax.y;
+      ctx.globalAlpha = .18;
+      ctx.drawImage(haze, cx - scale * .5, cy - scale * .38, scale, scale * .76);
+      const fieldRadius = Math.max(125, Math.min(260, scale * .65));
+      const tick = dt * 60;
+      const damping = Math.pow(.93, tick);
+      for (const star of stars) {
+        const angle = star.angle + time * .047 + Math.sin(time * .055 + star.r * 4) * .018;
+        const gx = Math.cos(angle) * star.r;
+        const gy = Math.sin(angle) * star.r * .74 + star.z;
+        const perspective = 1 + Math.sin(angle) * star.r * .08;
+        const homeX = cx + (gx * cosTilt - gy * sinTilt) * scale;
+        const homeY = cy + (gx * sinTilt + gy * cosTilt) * scale;
+        if (dt > 0) {
+          let ax = -star.ox * .0038, ay = -star.oy * .0038;
+          if (pointer.strength > .001) {
+            const dx = pointer.x - homeX - star.ox, dy = pointer.y - homeY - star.oy;
+            const distance = Math.hypot(dx, dy);
+            if (distance < fieldRadius) {
+              const falloff = Math.pow(1 - distance / fieldRadius, 2);
+              const force = pointer.strength * falloff * .88;
+              // Tangential force introduces a small orbit; softening avoids a singularity.
+              const divisor = Math.max(24, distance);
+              ax += (dx / divisor - dy / divisor * .38) * force;
+              ay += (dy / divisor + dx / divisor * .38) * force;
+            }
+          }
+          star.vx = (star.vx + ax * tick) * damping;
+          star.vy = (star.vy + ay * tick) * damping;
+          star.ox += star.vx * tick; star.oy += star.vy * tick;
+        }
+        const x = homeX + star.ox, y = homeY + star.oy;
+        const size = star.radius * 7 * perspective * Math.max(.7, Math.min(1.2, scale / 430));
+        if (x < -size || x > width + size || y < -size || y > height + size) continue;
+        ctx.globalAlpha = star.alpha * (.86 + .14 * Math.sin(time * .7 + star.phase));
+        ctx.drawImage(star.flare ? flares[star.color] : sprites[star.color], x - size / 2, y - size / 2, size, size);
+      }
+      // The cursor's gravity well is deliberately faint so the stars remain the focus.
+      if (pointer.strength > .015 && !paused) {
+        const size = pointer.down ? 95 : 55;
+        ctx.globalAlpha = Math.min(.13, pointer.strength * .055);
+        ctx.drawImage(haze, pointer.x - size / 2, pointer.y - size / 2, size, size);
+      }
+      // Keep even overlapping, intensely glowing stars blue instead of clipping to white.
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'multiply';
+      ctx.fillStyle = '#96c2ff'; ctx.fillRect(0, 0, width, height);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    function animate(now) {
+      frame = 0;
+      if (paused || document.hidden) { previous = 0; return; }
+      const dt = previous ? Math.min((now - previous) / 1000, .035) : 1 / 60;
+      previous = now; time += dt * speed;
+      draw(dt);
+      frame = requestAnimationFrame(animate);
+    }
+    function start() { if (!frame && !paused && !document.hidden) { previous = 0; frame = requestAnimationFrame(animate); } }
+    function updatePause() {
+      document.body.classList.toggle('paused', paused);
+      $('pause').setAttribute('aria-pressed', String(paused));
+      $('pause').setAttribute('aria-label', paused ? 'Reanudar animación' : 'Pausar animación');
+      $('pause-label').textContent = paused ? 'Reanudar' : 'Pausar';
+      $('pause-icon').innerHTML = paused ? '<path d="m7 4 9 6-9 6Z"/>' : '<path d="M7 5v10M13 5v10"/>';
+      $('status-text').textContent = paused ? 'EN PAUSA' : 'EN MOVIMIENTO';
+      if (paused) { cancelAnimationFrame(frame); frame = 0; previous = 0; } else start();
+    }
+    function setSettings(open) { $('settings').hidden = !open; $('settings-toggle').setAttribute('aria-expanded', String(open)); }
+    function setImmersive(value) {
+      immersive = value; document.body.classList.toggle('immersive', value);
+      document.querySelector('.interface').inert = value;
+      if (value) setSettings(false);
+      (value ? $('restore') : $('immerse')).focus({ preventScroll: true });
+    }
+    function clearPointer() { pointer.active = false; pointer.down = false; activePointer = null; }
+    function positionPointer(event) {
+      if (!pointer.active) { pointer.x = event.clientX; pointer.y = event.clientY; }
+      pointer.targetX = event.clientX; pointer.targetY = event.clientY; pointer.active = true;
+    }
+    canvas.addEventListener('pointermove', event => {
+      if (activePointer !== null && activePointer !== event.pointerId) return;
+      positionPointer(event);
+    });
+    canvas.addEventListener('pointerdown', event => {
+      if (activePointer !== null || event.button !== 0) return;
+      activePointer = event.pointerId; positionPointer(event); pointer.down = true;
+      canvas.setPointerCapture(event.pointerId);
+    });
+    canvas.addEventListener('pointerup', event => {
+      if (event.pointerId !== activePointer) return;
+      pointer.down = false; activePointer = null;
+      if (event.pointerType !== 'mouse' || event.clientX < 0 || event.clientX > width || event.clientY < 0 || event.clientY > height) pointer.active = false;
+    });
+    canvas.addEventListener('pointerleave', () => { if (!pointer.down) pointer.active = false; });
+    canvas.addEventListener('pointercancel', clearPointer);
+    canvas.addEventListener('lostpointercapture', () => { pointer.down = false; activePointer = null; });
+    window.addEventListener('blur', clearPointer);
+    $('pause').addEventListener('click', () => { paused = !paused; updatePause(); });
+    $('settings-toggle').addEventListener('click', () => setSettings($('settings').hidden));
+    $('immerse').addEventListener('click', () => setImmersive(true));
+    $('restore').addEventListener('click', () => setImmersive(false));
+    for (const id of ['gravity', 'speed']) {
+      $(id).addEventListener('input', event => {
+        const value = Number(event.target.value);
+        if (id === 'gravity') gravity = value; else speed = value;
+        const label = value.toFixed(1).replace('.', ',');
+        $(id + '-value').textContent = label + '×'; $(id).setAttribute('aria-valuetext', label + ' veces');
+      });
+    }
+    $('reset').addEventListener('click', () => {
+      time = 0; gravity = speed = 1; clearPointer(); pointer.strength = 0; parallax.x = parallax.y = 0;
+      for (const id of ['gravity', 'speed']) { $(id).value = 1; $(id + '-value').textContent = '1,0×'; $(id).setAttribute('aria-valuetext', '1,0 veces'); }
+      populate(); draw(0);
+    });
+    document.addEventListener('pointerdown', event => {
+      if (!event.target.closest('#settings, #settings-toggle')) setSettings(false);
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        if (!$('settings').hidden) { setSettings(false); $('settings-toggle').focus(); }
+        if (immersive) setImmersive(false); clearPointer(); return;
+      }
+      if (event.target.matches('input, textarea, select') || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key.toLowerCase() === 'h') { setImmersive(!immersive); return; }
+      if (event.target.matches('button')) return;
+      if (event.code === 'Space') { event.preventDefault(); paused = !paused; updatePause(); }
+      if (event.key.startsWith('Arrow')) {
+        event.preventDefault();
+        if (!pointer.active) { pointer.targetX = pointer.x = centerX; pointer.targetY = pointer.y = centerY; }
+        pointer.active = true;
+        if (event.key === 'ArrowLeft') pointer.targetX -= 24;
+        if (event.key === 'ArrowRight') pointer.targetX += 24;
+        if (event.key === 'ArrowUp') pointer.targetY -= 24;
+        if (event.key === 'ArrowDown') pointer.targetY += 24;
+        pointer.targetX = Math.max(0, Math.min(width, pointer.targetX)); pointer.targetY = Math.max(0, Math.min(height, pointer.targetY));
+      }
+    });
+    window.addEventListener('resize', resize);
+    document.addEventListener('visibilitychange', () => {
+      clearPointer(); previous = 0;
+      if (document.hidden) { cancelAnimationFrame(frame); frame = 0; } else start();
+    });
+    motionQuery.addEventListener('change', event => { paused = event.matches; updatePause(); });
+    resize(); updatePause();
+  })();
+  </script>
+</body>
+</html>

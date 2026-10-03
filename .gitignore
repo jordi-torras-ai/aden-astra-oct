@@ -1,0 +1,17 @@
+# macOS metadata
+.DS_Store
+._*
+
+# Local browser inspection and test artifacts
+.playwright-mcp/
+playwright-report/
+test-results/
+
+# Local tooling and logs
+node_modules/
+*.log
+
+# Local environment files
+.env
+.env.*
+!.env.example
